@@ -3,7 +3,7 @@
 
 #define LED_PIN     6
 #define NUM_LEDS    47
-#define BRIGHTNESS  100
+#define BRIGHTNESS  255
 #define LED_TYPE    WS2812B
 #define COLOR_ORDER GRB
 
@@ -18,7 +18,7 @@ void loop() {
     static uint8_t hue = INT8_MAX;
 
     for (int i = 0; i < NUM_LEDS; i++) {
-        leds[i] = CHSV(hue + i *4, 255, 255);
+        leds[i] = CHSV(hue + i * PI, 255, 255);
     }
 
     FastLED.show();
