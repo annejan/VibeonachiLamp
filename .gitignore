@@ -1,0 +1,4 @@
+.pio
+venv
+*.stl
+*.csv
