@@ -2,9 +2,9 @@
 // Parameters
 // =========================
 diameter = 150;          // mm
-thickness = 2.5;         // mm
+thickness = 4;           // mm
 hole_diameter = 8;       // mm
-hole_count = 50;         // aantal gaten (tweakbaar)
+hole_count = 47;        // aantal gaten (tweakbaar)
 $fn = 256;
 
 // =========================
