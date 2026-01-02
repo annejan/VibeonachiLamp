@@ -5,31 +5,18 @@ import math
 import sys
 
 # ===================== CONFIG =====================
-NUM_LEDS = 1024*8
-SCREEN_SIZE = 900
+NUM_LEDS = 400
+SCREEN = 1000
+POINT_SIZE = 16
 
-ROT_SPEED = 1.5
-EARTH_ROT_SPEED = 0.01
-SUN_ROT_SPEED   = 0.18
+DAY_TEX_SIZE   = (256, 128)
+NIGHT_TEX_SIZE = (128, 64)
 
 AXIAL_TILT = math.radians(23.44)
+TIME_SCALE = 24000.0
+VIEW_ROT_SPEED = 1.5    # toetsen
+# =================================================
 
-DAY_TEXTURE   = "world_day.png"
-NIGHT_TEXTURE = "world_night.png"
-
-# LED appearance
-POINT_SIZE_MIN = 7
-POINT_SIZE_MAX = 15
-ALPHA_MIN = 40
-ALPHA_MAX = 255
-
-# glow
-GLOW_RADIUS_MULT = 2.8
-GLOW_ALPHA_MULT  = 0.3
-
-# area sampling radius in texture pixels (1 = 5 samples)
-AREA_RADIUS = 1
-# ==================================================
 
 # ---------- Fibonacci sphere ----------
 def fibonacci_sphere(n):
@@ -38,93 +25,104 @@ def fibonacci_sphere(n):
     for i in range(n):
         y = 1 - 2 * i / (n - 1)
         r = math.sqrt(max(0, 1 - y*y))
-        theta = golden * i
+        t = golden * i
         pts[i] = (
-            math.cos(theta) * r,
+            math.cos(t) * r,
             y,
-            math.sin(theta) * r
+            math.sin(t) * r
         )
     return pts
 
-# ---------- Rotations ----------
-def rot_x(a):
-    c,s = math.cos(a), math.sin(a)
-    return np.array([[1,0,0],[0,c,-s],[0,s,c]], dtype=np.float32)
 
-def rot_y(a):
-    c,s = math.cos(a), math.sin(a)
-    return np.array([[c,0,s],[0,1,0],[-s,0,c]], dtype=np.float32)
+# ---------- Quaternion ----------
+def quat_mul(a, b):
+    return np.array([
+        a[0]*b[0] - a[1]*b[1] - a[2]*b[2] - a[3]*b[3],
+        a[0]*b[1] + a[1]*b[0] + a[2]*b[3] - a[3]*b[2],
+        a[0]*b[2] - a[1]*b[3] + a[2]*b[0] + a[3]*b[1],
+        a[0]*b[3] + a[1]*b[2] - a[2]*b[1] + a[3]*b[0]
+    ], dtype=np.float32)
 
-def rot_z(a):
-    c,s = math.cos(a), math.sin(a)
-    return np.array([[c,-s,0],[s,c,0],[0,0,1]], dtype=np.float32)
+def quat_axis(axis, angle):
+    s = math.sin(angle/2)
+    return np.array([
+        math.cos(angle/2),
+        axis[0]*s,
+        axis[1]*s,
+        axis[2]*s
+    ], dtype=np.float32)
+
+def quat_rotate(q, v):
+    qv = np.array([0, v[0], v[1], v[2]], dtype=np.float32)
+    qi = np.array([q[0], -q[1], -q[2], -q[3]], dtype=np.float32)
+    r = quat_mul(quat_mul(q, qv), qi)
+    return r[1:]
+
 
 # ---------- XYZ → UV ----------
 def xyz_to_uv(p):
     lon = np.arctan2(p[:,2], p[:,0])
     lat = np.arcsin(p[:,1])
-
     u = 1.0 - ((lon + math.pi) / (2 * math.pi))
     v = (math.pi/2 - lat) / math.pi
-
     return np.clip(u,0,0.9999), np.clip(v,0,0.9999)
 
 
-# ---------- Projection ----------
-def project(p):
-    scale = SCREEN_SIZE * 0.35
-    x = p[:,0] * scale + SCREEN_SIZE/2
-    y = -p[:,1] * scale + SCREEN_SIZE/2
-    return np.stack((x,y), axis=1)
+# ---------- Texture loading ----------
+def load_tex(path, size):
+    img = Image.open(path).convert("RGB")
+    img = img.resize(size, Image.LANCZOS)
+    arr = np.array(img, dtype=np.float32)
+    print(f"{path}: {size[0]}×{size[1]} ({arr.size/1024:.1f} KB)")
+    return arr
 
-# ---------- Load textures ----------
-def load_tex(path):
-    return np.array(Image.open(path).convert("RGB")).astype(np.float32)
-
-tex_day   = load_tex(DAY_TEXTURE)
-tex_night = load_tex(NIGHT_TEXTURE)
-H, W, _ = tex_day.shape
 
 # ---------- Area sampling ----------
-def sample_area(tex, u, v, r):
+def sample_area(tex, u, v, r=1):
     H, W, _ = tex.shape
+    x = (u * (W - 1)).astype(int)
+    y = (v * (H - 1)).astype(int)
 
-    px = (u * (W - 1)).astype(int)
-    py = (v * (H - 1)).astype(int)
-
-    acc = np.zeros((len(px), 3), dtype=np.float32)
-    count = 0
+    acc = np.zeros((len(u), 3), dtype=np.float32)
+    cnt = np.zeros(len(u), dtype=np.float32)
 
     for dy in range(-r, r+1):
         for dx in range(-r, r+1):
             if dx*dx + dy*dy > r*r:
                 continue
-
-            sx = np.clip(px + dx, 0, W - 1)
-            sy = np.clip(py + dy, 0, H - 1)
-
+            sx = np.clip(x+dx, 0, W-1)
+            sy = np.clip(y+dy, 0, H-1)
             acc += tex[sy, sx]
-            count += 1
+            cnt += 1
 
-    return acc / count
+    return acc / cnt[:,None]
 
 
 # ===================== MAIN =====================
 pygame.init()
-screen = pygame.display.set_mode((SCREEN_SIZE,SCREEN_SIZE))
-pygame.display.set_caption("LED Sphere – Area Sampling")
+screen = pygame.display.set_mode((SCREEN, SCREEN))
+pygame.display.set_caption(f"LED Globe Simulator – {NUM_LEDS} LEDs")
 clock = pygame.time.Clock()
+
+tex_day   = load_tex("world_day.png", DAY_TEX_SIZE)
+tex_night = load_tex("world_night.png", NIGHT_TEX_SIZE)
 
 points = fibonacci_sphere(NUM_LEDS)
 
-camX = 0.0
-camY = 0.0
-earth_rot = 0.0
-sun_rot   = 0.0
+# mouse = IMU quaternion
+pygame.event.set_grab(True)
+pygame.mouse.set_visible(False)
+q_cam = np.array([1,0,0,0], dtype=np.float32)
+
+# keyboard = absolute world offset (THIS is the key)
+q_world = np.array([1,0,0,0], dtype=np.float32)
+
+seconds_today = 12 * 3600
+day_of_year   = 172
 
 running = True
 while running:
-    dt = clock.tick(60)/1000.0
+    dt = clock.tick(60) / 1000.0
 
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
@@ -132,80 +130,75 @@ while running:
         if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
             running = False
 
-    # ---------- CAMERA INPUT ----------
+    # ---------- mouse → IMU ----------
+    dx, dy = pygame.mouse.get_rel()
+    q_cam = quat_mul(quat_axis([0,1,0], -dx*0.002), q_cam)
+    q_cam = quat_mul(quat_axis([1,0,0], -dy*0.002), q_cam)
+
+    # ---------- keyboard → WORLD OFFSET (FIXED ORDER) ----------
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:  camY -= ROT_SPEED * dt
-    if keys[pygame.K_RIGHT]: camY += ROT_SPEED * dt
-    if keys[pygame.K_UP]:    camX -= ROT_SPEED * dt
-    if keys[pygame.K_DOWN]:  camX += ROT_SPEED * dt
+    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+        q_world = quat_mul(
+            q_world,
+            quat_axis([0,1,0],  VIEW_ROT_SPEED * dt)
+        )
+    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+        q_world = quat_mul(
+            q_world,
+            quat_axis([0,1,0], -VIEW_ROT_SPEED * dt)
+        )
 
-    camX = max(-math.pi/2 + 0.05, min(math.pi/2 - 0.05, camX))
+    # normalize (important)
+    q_world /= np.linalg.norm(q_world)
 
-    # ---------- AUTOMATIC MOTION ----------
-    earth_rot += EARTH_ROT_SPEED * dt
-    sun_rot   += SUN_ROT_SPEED * dt
+    # ---------- time ----------
+    seconds_today += dt * TIME_SCALE
+    if seconds_today >= 86400:
+        seconds_today -= 86400
+        day_of_year = (day_of_year + 1) % 365
 
-    # ---------- ROTATION PIPELINE ----------
-    R_tilt  = rot_x(AXIAL_TILT)
-    R_earth = rot_y(earth_rot) @ R_tilt
-    R_cam   = rot_y(camY) @ rot_x(camX)
+    sun_lon = 2*math.pi * (seconds_today / 86400.0)
+    sun_lat = math.sin(2*math.pi * day_of_year / 365.2422) * AXIAL_TILT
 
-    world = points @ R_earth.T
-    camera_space = world @ R_cam.T
-
-    # ---------- SUN LIGHT ----------
-    sun_dir = np.array([
-        math.cos(sun_rot),
-        math.sin(sun_rot) * math.sin(AXIAL_TILT),
-        math.sin(sun_rot)
+    sun = np.array([
+        math.cos(sun_lat)*math.cos(sun_lon),
+        math.sin(sun_lat),
+        math.cos(sun_lat)*math.sin(sun_lon)
     ], dtype=np.float32)
-    sun_dir /= np.linalg.norm(sun_dir)
 
-    light = np.einsum('ij,j->i', world, sun_dir)
-    day = np.clip((light - 0.1) / 0.9, 0, 1)
+    # ---------- WORLD ROTATION PIPELINE ----------
+    world = []
+    for x,y,z in points:
+        p = quat_rotate(q_cam, (x,y,z))           # IMU / mouse movement
+        world.append(p)
 
-    # ---------- TEXTURE SAMPLING (AREA) ----------
-    u,v = xyz_to_uv(world)
-    col_day   = sample_area(tex_day,   u, v, AREA_RADIUS)
-    col_night = sample_area(tex_night, u, v, AREA_RADIUS)
-    colors = col_day * day[:,None] + col_night * (1 - day[:,None])
+    world = np.array(world, dtype=np.float32)
+
+    # ---------- lighting ----------
+    light = np.clip(world @ sun, 0, 1)
+
+    # ---------- textures ----------
+    u, v = xyz_to_uv(world)
+    col_day   = sample_area(tex_day, u, v)
+    col_night = sample_area(tex_night, u, v)
+    colors = col_day * light[:,None] + col_night * (1-light[:,None])
     colors = colors.astype(np.uint8)
 
-    # ---------- VISIBILITY ----------
-    visible = camera_space[:,2] > 0
-    proj = project(camera_space)
-
-    # ---------- DRAW ----------
+    # ---------- draw ----------
     screen.fill((0,0,0))
-    for i in range(NUM_LEDS):
-        if not visible[i]:
+    scale = SCREEN * 0.38
+
+    for i,(x,y,z) in enumerate(world):
+        if z <= 0:
             continue
-
-        x,y = proj[i]
-        if not (0 <= x < SCREEN_SIZE and 0 <= y < SCREEN_SIZE):
-            continue
-
-        facing = max(0.0, min(1.0, camera_space[i, 2]))
-        f = facing ** 1.5
-
-        size  = POINT_SIZE_MIN + f * (POINT_SIZE_MAX - POINT_SIZE_MIN)
-        alpha = ALPHA_MIN + f * (ALPHA_MAX - ALPHA_MIN)
-
-        c = colors[i]
-
-        # glow
-        glow_r = int(size * GLOW_RADIUS_MULT)
-        glow_a = int(alpha * GLOW_ALPHA_MULT)
-        if glow_a > 0:
-            surf = pygame.Surface((2*glow_r,2*glow_r), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (*c, glow_a), (glow_r,glow_r), glow_r)
-            screen.blit(surf, (int(x-glow_r), int(y-glow_r)))
-
-        # core LED
-        r = int(size)
-        surf = pygame.Surface((2*r,2*r), pygame.SRCALPHA)
-        pygame.draw.circle(surf, (*c, int(alpha)), (r,r), r)
-        screen.blit(surf, (int(x-r), int(y-r)))
+        px = int(x*scale + SCREEN//2)
+        py = int(-y*scale + SCREEN//2)
+        pygame.draw.circle(
+            screen,
+            colors[i].tolist(),
+            (px,py),
+            POINT_SIZE
+        )
 
     pygame.display.flip()
 

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body>
+<h2>Earth Globe Setup</h2>
+
+<form action="/save" method="POST">
+Brightness:<br>
+<input type="range" min="0" max="1" step="0.01" name="brightness" value="%BRIGHT%"><br><br>
+
+Time scale:<br>
+<input type="number" name="time" value="%TIME%"><br><br>
+
+<button type="submit">Save & Reboot</button>
+</form>
+
+<br>
+<form action="/recenter" method="POST">
+<button type="submit">Recenter IMU</button>
+</form>
+
+<hr>
+<h3>WiFi / Time</h3>
+
+<form action="/wifi" method="POST">
+SSID:<br>
+<input name="ssid"><br>
+Password:<br>
+<input name="pass" type="password"><br><br>
+<button type="submit">Save WiFi</button>
+</form>
+
+<br>
+<form action="/ntp" method="POST">
+<button type="submit">Sync NTP Now</button>
+</form>
+
+</body>
+</html>
