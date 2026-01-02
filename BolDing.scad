@@ -21,7 +21,7 @@ show_numbers = true;       // [true:false]
 number_size = 4;           // mm
 number_depth = 1.0;        // mm (engrave depth)
 number_offset = 0.01;      // mm (push text just outside inner wall)
-number_offset_x = 9;
+number_offset_y = 8;
 
 /* [Assembly] */
 show_part = "top";        // ["top","bottom","both"]
@@ -134,10 +134,17 @@ module holes_fibonacci() {
 // =====================================================
 
 module hole_number(i, theta, phi) {
+    if (show_part == "top")
+        number_offset_y=-number_offset_y;
+        rotator = 90;
+    } else if (show_part == "bottom") {
+        rotator = -90;
+    }
+    
     rotate([0, 0, phi])
     rotate([0, theta, 0])
-    translate([number_offset_x, 0, r_inner + number_offset]) // just outside inner wall
-    rotate([180, 0, 0])                        // readable from inside
+    translate([number_offset_y, 0, r_inner + number_offset]) // just outside inner wall
+    rotate([180, 0, -90])                        // readable from inside
         linear_extrude(
             height = number_depth + 2,         // force overlap
             center = false
@@ -147,7 +154,7 @@ module hole_number(i, theta, phi) {
                 size = number_size,
                 halign = "center",
                 valign = "center",
-                font = "Liberation Sans:style=Bold"
+                font = "HersheySimplex"
             );
 }
 
