@@ -3,7 +3,7 @@
 // =====================================================
 
 /* [Geometry] */
-diameter = 200;          // [50:400]
+diameter = 250;          // [50:400]
 thickness_x10 = 80;      // [10:100]
 
 /* [LED Holes] */
@@ -13,18 +13,18 @@ hole_count = 400;        // [50:800]
 /* [Magnets] */
 magnet_diameter_x10  = 40; // [10:100]
 magnet_thickness_x10 = 40; // [20:60]
-magnet_clearance_x10 = 1;  // [0:10]
+magnet_clearance_x10 = .1; // [0:10]
 magnet_count = 8;          // [2:16]
 
 /* [Debug Numbers] */
-show_numbers = false;       // [true:false]
+show_numbers = true;       // [true:false]
 number_size = 4;           // mm
 number_depth = 1.0;        // mm (engrave depth)
 number_offset = 0.01;      // mm (push text just outside inner wall)
 number_offset_x = 9;
 
 /* [Assembly] */
-show_part = "both";        // ["top","bottom","both"]
+show_part = "top";        // ["top","bottom","both"]
 split_gap_x100 = 0;        // [0:200]
 
 $fn = 128;                 // [32:256]

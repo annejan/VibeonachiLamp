@@ -4,7 +4,7 @@
 #include "day_tex.h"
 #include "night_tex.h"
 
-#define NUM_LEDS 1000
+#define NUM_LEDS 400
 #define PI 3.14159265358979323846f
 #define AXIAL_TILT (23.44f * PI / 180.0f)
 

@@ -16,7 +16,7 @@ void led_render_quat(float qw, float qx, float qy, float qz, float sun_lon,
 #define tex_night night_tex
 
 // ================= CONFIG =================
-#define NUM_LEDS 300
+#define NUM_LEDS 400
 #define LED_PIN 5
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
