@@ -5,12 +5,15 @@ import matplotlib.pyplot as plt
 # =====================================================
 # Parameters
 # =====================================================
-diameter = 180          # mm
-thickness = 8           # mm
-hole_count = 400
+diameter = 180
+thickness = 8
+led_count = 400
 
-use_hemisphere = True   # True = LEDs 0–199
-hemisphere = "north"    # "north" or "south"
+hemisphere = "north"       # LEDs 0–199
+SEG_SAMPLES = 40           # sampling along wires
+Z_BINS = 120               # resolution of profile
+Z_SLICE_THICKNESS = 1.0    # mm
+SAFETY_MARGIN = 2.5        # mm
 
 # =====================================================
 # Derived
@@ -23,8 +26,8 @@ golden = (1 + math.sqrt(5)) / 2
 # Generate Fibonacci points
 # =====================================================
 points = []
-for i in range(hole_count):
-    z = 1 - 2 * (i + 0.5) / hole_count
+for i in range(led_count):
+    z = 1 - 2 * (i + 0.5) / led_count
     theta = math.acos(z)
     phi = 2 * math.pi * i / golden
 
@@ -37,119 +40,107 @@ for i in range(hole_count):
 points = np.array(points)
 
 # =====================================================
-# Select data path
+# Data path
 # =====================================================
-if use_hemisphere:
-    if hemisphere == "north":
-        data_path = list(range(0, hole_count // 2))
-    else:
-        data_path = list(range(hole_count // 2, hole_count))
+if hemisphere == "north":
+    data_path = list(range(0, led_count // 2))
 else:
-    data_path = list(range(hole_count))
+    data_path = list(range(led_count // 2, led_count))
 
 # =====================================================
-# Geometry helper
+# Sample all data wires
 # =====================================================
-def segment_distance_to_origin(a, b):
-    """
-    Shortest distance from line segment a-b to origin (0,0,0)
-    """
-    ab = b - a
-    denom = np.dot(ab, ab)
-    if denom < 1e-12:
-        return np.linalg.norm(a)
-
-    t = -np.dot(a, ab) / denom
-    t = np.clip(t, 0.0, 1.0)
-    closest = a + t * ab
-    return np.linalg.norm(closest)
-
-# =====================================================
-# Compute hole radius
-# =====================================================
-min_dist = float("inf")
-worst_segment = None
+samples = []
 
 for i in range(len(data_path) - 1):
     a = points[data_path[i]]
     b = points[data_path[i + 1]]
-    d = segment_distance_to_origin(a, b)
+    for t in np.linspace(0, 1, SEG_SAMPLES):
+        samples.append(a * (1 - t) + b * t)
 
-    if d < min_dist:
-        min_dist = d
-        worst_segment = (data_path[i], data_path[i + 1])
-
-# =====================================================
-# Results
-# =====================================================
-print("\n=== Data wiring hole analysis ===")
-print(f"Inner sphere radius: {r_inner:.1f} mm")
-print(f"Data LEDs considered: {len(data_path)}")
-print(f"Worst segment: LED {worst_segment[0]} → {worst_segment[1]}")
-print(f"Free hole radius:   {min_dist:.1f} mm")
-print(f"Free hole diameter: {2 * min_dist:.1f} mm")
-
-# Conservative safety margin
-margin = 5.0
-safe_radius = max(0.0, min_dist - margin)
-
-print(f"\nWith {margin:.1f} mm safety margin:")
-print(f"Safe usable radius:   {safe_radius:.1f} mm")
-print(f"Safe usable diameter: {2 * safe_radius:.1f} mm")
+samples = np.array(samples)
 
 # =====================================================
-# Optional visualization
+# Radial profile ρ(z)
 # =====================================================
-fig = plt.figure(figsize=(9, 9))
-ax = fig.add_subplot(111, projection="3d")
+z_min = samples[:, 2].min()
+z_max = samples[:, 2].max()
 
-# Reference sphere
+z_centers = np.linspace(z_min, z_max, Z_BINS)
+rho_free = []
+
+for zc in z_centers:
+    slab = samples[np.abs(samples[:, 2] - zc) <= Z_SLICE_THICKNESS]
+    if len(slab) == 0:
+        rho_free.append(np.nan)
+    else:
+        rho_free.append(np.min(np.hypot(slab[:, 0], slab[:, 1])))
+
+rho_free = np.array(rho_free)
+
+# apply safety margin
+rho_safe = rho_free - SAFETY_MARGIN
+
+# =====================================================
+# Report key values
+# =====================================================
+min_idx = np.nanargmin(rho_free)
+
+print("\n=== Radial free-space profile ===")
+print(f"Minimum free diameter: {2 * rho_free[min_idx]:.1f} mm")
+print(f"At z = {z_centers[min_idx]:.1f} mm")
+print(f"Safe minimum diameter: {2 * rho_safe[min_idx]:.1f} mm")
+
+# =====================================================
+# Visualization
+# =====================================================
+fig = plt.figure(figsize=(14, 6))
+
+# --- left: 3D context ---
+ax3d = fig.add_subplot(121, projection="3d")
+
+# inner shell
 u = np.linspace(0, 2 * math.pi, 60)
 v = np.linspace(0, math.pi, 30)
 xs = r_inner * np.outer(np.cos(u), np.sin(v))
 ys = r_inner * np.outer(np.sin(u), np.sin(v))
 zs = r_inner * np.outer(np.ones_like(u), np.cos(v))
-ax.plot_surface(xs, ys, zs, color="lightgray", alpha=0.05, linewidth=0)
+ax3d.plot_surface(xs, ys, zs, color="lightgray", alpha=0.04, linewidth=0)
 
-# Data wiring
+# data wiring
 for i in range(len(data_path) - 1):
     p = points[data_path[i]]
     q = points[data_path[i + 1]]
-    ax.plot(
+    ax3d.plot(
         [p[0], q[0]],
         [p[1], q[1]],
         [p[2], q[2]],
         color="steelblue",
         alpha=0.6,
-        linewidth=1.2
+        linewidth=1.1
     )
 
-# LEDs
-hp = np.array([points[i] for i in data_path])
-ax.scatter(hp[:, 0], hp[:, 1], hp[:, 2],
-           color="black", s=6, alpha=0.3)
+ax3d.set_box_aspect([1, 1, 1])
+ax3d.set_xlim(-r_inner, r_inner)
+ax3d.set_ylim(-r_inner, r_inner)
+ax3d.set_zlim(-r_inner, r_inner)
+ax3d.view_init(elev=20, azim=35)
+ax3d.set_title("Data wiring context")
 
-# Hole sphere
-u = np.linspace(0, 2 * math.pi, 40)
-v = np.linspace(0, math.pi, 20)
-xh = min_dist * np.outer(np.cos(u), np.sin(v))
-yh = min_dist * np.outer(np.sin(u), np.sin(v))
-zh = min_dist * np.outer(np.ones_like(u), np.cos(v))
-ax.plot_surface(xh, yh, zh, color="green", alpha=0.15, linewidth=0)
+# --- right: radial profile ---
+ax = fig.add_subplot(122)
 
-# Axes
-lim = r_inner * 1.1
-ax.set_xlim(-lim, lim)
-ax.set_ylim(-lim, lim)
-ax.set_zlim(-lim, lim)
-ax.set_box_aspect([1, 1, 1])
-ax.view_init(elev=20, azim=35)
+ax.plot(z_centers, 2 * rho_free, label="Free diameter", linewidth=2)
+ax.plot(z_centers, 2 * rho_safe, "--", label="Safe diameter", linewidth=2)
 
-ax.set_title(
-    "Data wiring hole analysis\n"
-    f"Free diameter ≈ {2 * min_dist:.1f} mm"
-)
+ax.axvline(z_centers[min_idx], color="red", linestyle=":")
+ax.axhline(2 * rho_free[min_idx], color="red", linestyle=":")
+
+ax.set_xlabel("Z position (mm)")
+ax.set_ylabel("Diameter (mm)")
+ax.set_title("Free diameter vs Z (pole → equator)")
+ax.grid(True)
+ax.legend()
 
 plt.tight_layout()
 plt.show()
-

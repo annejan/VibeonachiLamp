@@ -17,13 +17,19 @@ magnet_clearance_x10 = .1; // [0:10]
 magnet_count = 8;          // [2:16]
 
 /* [Debug Numbers] */
-show_numbers = true;       // [true:false]
+show_numbers = false;       // [true:false]
 number_size = 4;           // mm
 number_depth = 1.0;        // mm (engrave depth)
 number_offset = 0.01;      // mm (push text just outside inner wall)
 number_offset_x = 0;
 number_offset_y = 7;
 number_rotate = -90;
+
+
+/* [Payload / Safe Zone] */
+show_payload = true;
+payload_radius = 30;  
+payload_clearance = 0;            // hoeveel vrijhouden van wand
 
 /* [Assembly] */
 show_part = "bottom";        // ["top","bottom","both"]
@@ -47,6 +53,7 @@ r_inner = R - thickness;
 hc = hole_count;
 
 golden = (1 + sqrt(5)) / 2;
+
 
 // Magnet geometry
 magnet_r = magnet_diameter/2 + magnet_clearance;
@@ -185,6 +192,42 @@ module magnet_pockets() {
         magnet_pocket(phi);
 }
 
+//  ==============
+//  Payload module
+//  ==============
+module payload(payload_width, wall_clearance) {
+    // payload_height  = halve hoogte (Z)
+    // wall_clearance  = afstand tot binnenwand bij evenaar
+
+    a = payload_width;   // max radius at equator
+    b = r_inner - wall_clearance;             // half height
+
+    rotate_extrude($fn = 200)
+        polygon(
+            concat(
+                [[0, -b]],
+                [
+                    for (z = [-b : 1 : b])
+                        [
+                            a * sqrt( max(0, 1 - (z*z)/(b*b)) ),
+                            z
+                        ]
+                ],
+                [[0, b]]
+            )
+        );
+}
+
+
+
+
+module payload_safe_zone() {
+    payload(
+        payload_radius,
+        payload_clearance
+    );
+}
+
 // =====================================================
 // Split helpers
 // =====================================================
@@ -218,6 +261,12 @@ module full_sphere_with_features() {
         if (show_numbers)
             hole_numbers();
     }
+    
+    
+    if (show_payload)
+        color([1,0,0,0.2])
+            payload_safe_zone();
+
 }
 
 if (show_part == "top")
