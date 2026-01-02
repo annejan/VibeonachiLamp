@@ -1,18 +1,16 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 # =====================================================
-# Parameters (match je SCAD)
+# Parameters
 # =====================================================
 diameter = 180
-thickness = 2.5
+thickness = 8
 hole_count = 400
 
-wiring_mode = "fibonacci"  
-# "fibonacci" = i -> i+1
-# "nearest"   = nearest-neighbor wiring
+wiring_mode = "fibonacci"   # "fibonacci" or "nearest"
+hemisphere = "north"        # "north" or "south"
 
 # =====================================================
 # Derived values
@@ -36,6 +34,18 @@ for i in range(hole_count):
 
     points.append(np.array([x, y, zc]))
 
+points = np.array(points)
+
+# =====================================================
+# Select hemisphere
+# =====================================================
+if hemisphere == "north":
+    hemi_indices = [i for i, p in enumerate(points) if p[2] >= 0]
+else:
+    hemi_indices = [i for i, p in enumerate(points) if p[2] <= 0]
+
+hemi_points = {i: points[i] for i in hemi_indices}
+
 # =====================================================
 # Distance helper
 # =====================================================
@@ -43,15 +53,16 @@ def dist(p, q):
     return np.linalg.norm(p - q)
 
 # =====================================================
-# Build wiring path
+# Build wiring path (within hemisphere)
 # =====================================================
 if wiring_mode == "fibonacci":
-    path = list(range(len(points)))
+    path = [i for i in range(hole_count) if i in hemi_indices]
 
 elif wiring_mode == "nearest":
-    unused = set(range(len(points)))
-    path = [0]
-    unused.remove(0)
+    unused = set(hemi_indices)
+    start = hemi_indices[0]
+    path = [start]
+    unused.remove(start)
 
     while unused:
         last = path[-1]
@@ -73,14 +84,14 @@ segments = np.array([
 # =====================================================
 # Visualization
 # =====================================================
-fig = plt.figure(figsize=(9, 8))
+fig = plt.figure(figsize=(9, 9))
 ax = fig.add_subplot(111, projection="3d")
 
-# Normalize for color mapping
+# Color mapping
 norm = (segments - segments.min()) / (segments.max() - segments.min() + 1e-9)
-
 cmap = plt.cm.coolwarm if wiring_mode == "fibonacci" else plt.cm.viridis
 
+# Draw wiring
 for i in range(len(path) - 1):
     p = points[path[i]]
     q = points[path[i + 1]]
@@ -92,13 +103,46 @@ for i in range(len(path) - 1):
         linewidth=2
     )
 
-# LED points
-xs, ys, zs = zip(*points)
-ax.scatter(xs, ys, zs, color="black", s=6, alpha=0.3)
+# Hemisphere LEDs
+hp = np.array(list(hemi_points.values()))
+ax.scatter(hp[:, 0], hp[:, 1], hp[:, 2],
+           color="black", s=8, alpha=0.4)
+
+# Other hemisphere (context only)
+other = np.array([
+    p for i, p in enumerate(points)
+    if i not in hemi_indices
+])
+ax.scatter(other[:, 0], other[:, 1], other[:, 2],
+           color="gray", s=4, alpha=0.05)
+
+# =====================================================
+# Transparent reference sphere
+# =====================================================
+u = np.linspace(0, 2 * np.pi, 80)
+v = np.linspace(0, np.pi, 40)
+
+xs = r_inner * np.outer(np.cos(u), np.sin(v))
+ys = r_inner * np.outer(np.sin(u), np.sin(v))
+zs = r_inner * np.outer(np.ones_like(u), np.cos(v))
+
+ax.plot_surface(xs, ys, zs,
+                color="lightgray",
+                alpha=0.06,
+                linewidth=0)
+
+# =====================================================
+# Axes & layout
+# =====================================================
+lim = r_inner * 1.1
+ax.set_xlim(-lim, lim)
+ax.set_ylim(-lim, lim)
+ax.set_zlim(-lim, lim)
+ax.set_box_aspect([1, 1, 1])
 
 ax.set_title(
-    f"{wiring_mode.capitalize()} wiring\n"
-    f"Blue = short segments, Red/Yellow = long segments"
+    f"{hemisphere.capitalize()} hemisphere – {wiring_mode} data wiring\n"
+    f"Blue = short, Red = long segments"
 )
 ax.set_xlabel("X (mm)")
 ax.set_ylabel("Y (mm)")
@@ -117,7 +161,8 @@ plt.show()
 # =====================================================
 print("=== Wiring statistics ===")
 print("Mode:", wiring_mode)
-print("LED count:", hole_count)
+print("Hemisphere:", hemisphere)
+print("LED count:", len(path))
 print("Min segment:", segments.min(), "mm")
 print("Max segment:", segments.max(), "mm")
 print("Avg segment:", segments.mean(), "mm")
