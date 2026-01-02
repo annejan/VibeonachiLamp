@@ -6,7 +6,7 @@ from mpl_toolkits.mplot3d import Axes3D
 # =====================================================
 # Parameters (match je SCAD)
 # =====================================================
-diameter = 200
+diameter = 180
 thickness = 2.5
 hole_count = 400
 

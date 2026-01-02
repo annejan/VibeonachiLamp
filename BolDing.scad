@@ -1,9 +1,9 @@
 // =====================================================
-// Parameters (Customizer-proof)
+// LED Globe 3D frame
 // =====================================================
 
 /* [Geometry] */
-diameter = 250;          // [50:400]
+diameter = 180;          // [50:400]
 thickness_x10 = 80;      // [10:100]
 
 /* [LED Holes] */
@@ -21,13 +21,15 @@ show_numbers = true;       // [true:false]
 number_size = 4;           // mm
 number_depth = 1.0;        // mm (engrave depth)
 number_offset = 0.01;      // mm (push text just outside inner wall)
-number_offset_y = 8;
+number_offset_x = 0;
+number_offset_y = 7;
+number_rotate = -90;
 
 /* [Assembly] */
-show_part = "top";        // ["top","bottom","both"]
+show_part = "bottom";        // ["top","bottom","both"]
 split_gap_x100 = 0;        // [0:200]
 
-$fn = 128;                 // [32:256]
+$fn = 80;                 // [32:256]
 
 // =====================================================
 // Derived values
@@ -134,17 +136,10 @@ module holes_fibonacci() {
 // =====================================================
 
 module hole_number(i, theta, phi) {
-    if (show_part == "top")
-        number_offset_y=-number_offset_y;
-        rotator = 90;
-    } else if (show_part == "bottom") {
-        rotator = -90;
-    }
-    
     rotate([0, 0, phi])
     rotate([0, theta, 0])
-    translate([number_offset_y, 0, r_inner + number_offset]) // just outside inner wall
-    rotate([180, 0, -90])                        // readable from inside
+    translate([number_offset_y, number_offset_x, r_inner + number_offset]) // just outside inner wall
+    rotate([180, 0, number_rotate])                        // readable from inside
         linear_extrude(
             height = number_depth + 2,         // force overlap
             center = false
@@ -179,8 +174,7 @@ module magnet_pocket(phi) {
             cylinder(
                 r = magnet_r,
                 h = magnet_len/2,
-                center = true,
-                $fn = 32
+                center = true
             );
     }
 }
