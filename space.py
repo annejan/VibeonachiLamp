@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 # =====================================================
 # Parameters
 # =====================================================
-diameter = 180
+diameter = 350
 thickness = 8
-led_count = 400
+led_count = 1337
 
 hemisphere = "north"       # LEDs 0–199
 SEG_SAMPLES = 40           # sampling along wires

@@ -3,12 +3,12 @@
 // =====================================================
 
 /* [Geometry] */
-diameter = 180;              // [50:400]
+diameter = 350;              // [50:400]
 thickness_x10 = 80;          // [10:100]
 
 /* [LED Holes] */
 hole_diameter_x10 = 80;      // [20:200]
-hole_count = 400;            // [50:800]
+hole_count = 1337;            // [50:800]
 
 /* [Magnets – equator coupling] */
 magnet_diameter_x10  = 40;   // [10:100]
@@ -27,11 +27,11 @@ number_rotate = -90;
 
 /* [Payload / wiring safe zone] */
 show_payload = true;
-payload_equator_radius = 30;     // max radius at equator
+payload_equator_radius = 60;     // max radius at equator
 payload_clearance = 0;           // distance to inner wall
 
 /* [Assembly] */
-show_part = "bottom";        // ["top","bottom","both"]
+show_part = "top";        // ["top","bottom","both"]
 split_gap_x100 = 0;          // [0:200]
 
 $fn = 80;

@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 # =====================================================
 # Parameters
 # =====================================================
-diameter = 180
+diameter = 350
 thickness = 8
-hole_count = 400
+hole_count = 1337
 
 wiring_mode = "fibonacci"   # "fibonacci" or "nearest"
 hemisphere = "north"        # "north" or "south"

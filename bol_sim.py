@@ -5,9 +5,9 @@ import math
 import sys
 
 # ===================== CONFIG =====================
-NUM_LEDS = 400
+NUM_LEDS = 1337
 SCREEN = 1000
-POINT_SIZE = 16
+POINT_SIZE = 8
 
 DAY_TEX_SIZE   = (512, 256)
 NIGHT_TEX_SIZE = (256, 128)
